@@ -3,15 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة تحكم DOSSA</title>
+  <title>لوحة تحكم DOSSA (Backend محلي)</title>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <style>
-    /* نفس التنسيقات السابقة دون تغيير */
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family: 'Plus Jakarta Sans', sans-serif; background:#0A0E14; color:#E0E0E0; min-height:100vh; display:flex; align-items:center; justify-content:center; }
     #loginScreen { background:#111C26; padding:40px; border-radius:32px; width:100%; max-width:420px; border:1px solid #2A3A4A; }
@@ -45,19 +40,14 @@
     .progress-bar { height:100%; width:0%; background:#00D2FF; border-radius:6px; }
     .social-inputs { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
     #settingsMsg { margin-top:20px; color:#0f0; }
-    .remember-me { display:flex; align-items:center; margin-bottom:20px; color:#ccc; }
-    .remember-me input { margin-left:10px; width:18px; height:18px; accent-color:#00D2FF; }
   </style>
 </head>
 <body>
 
 <div id="loginScreen">
   <h2><i class="fas fa-lock"></i> دخول المشرف</h2>
-  <div class="input-group"><input type="email" id="loginEmail" placeholder="البريد الإلكتروني" autocomplete="email"></div>
-  <div class="input-group"><input type="password" id="loginPassword" placeholder="كلمة المرور" autocomplete="current-password"></div>
-  <div class="remember-me">
-    <input type="checkbox" id="rememberMe"> <label for="rememberMe">تذكرني</label>
-  </div>
+  <div class="input-group"><input type="email" id="loginEmail" placeholder="البريد الإلكتروني" value="admin@dossa.com"></div>
+  <div class="input-group"><input type="password" id="loginPassword" placeholder="كلمة المرور" value="admin123"></div>
   <button class="btn-login" id="loginBtn">تسجيل الدخول</button>
   <div class="error-msg" id="loginError"></div>
 </div>
@@ -65,7 +55,7 @@
 <div id="dashboardScreen">
   <div class="admin-container">
     <div class="admin-header">
-      <h1><i class="fas fa-shoe-prints"></i> لوحة تحكم DOSSA</h1>
+      <h1><i class="fas fa-shoe-prints"></i> لوحة تحكم DOSSA (محلي)</h1>
       <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</button>
     </div>
     <div class="tabs">
@@ -103,273 +93,340 @@
 </div>
 
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyCMJXK0y7Gico4ZMZmLORKItDfMmTnpt_A",
-    authDomain: "dossa-7d991.firebaseapp.com",
-    databaseURL: "https://dossa-7d991-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "dossa-7d991",
-    storageBucket: "dossa-7d991.firebasestorage.app",
-    messagingSenderId: "140143802952",
-    appId: "1:140143802952:web:d68e64ca1b2f3dfb03f67d"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-  const storage = firebase.storage();
-  const auth = firebase.auth();
+  (function(){
+    // ------------------- محاكاة API (Mock Backend) -------------------
+    const MOCK_DELAY = 300; // تأخير بسيط لمحاكاة الشبكة
+    const STORAGE_PRODUCTS = 'mock_products';
+    const STORAGE_SETTINGS = 'mock_settings';
 
-  // عناصر DOM
-  const loginScreen = document.getElementById('loginScreen');
-  const dashboardScreen = document.getElementById('dashboardScreen');
-  const loginBtn = document.getElementById('loginBtn');
-  const logoutBtn = document.getElementById('logoutBtn');
-  const loginError = document.getElementById('loginError');
-  const loginEmail = document.getElementById('loginEmail');
-  const loginPassword = document.getElementById('loginPassword');
-  const rememberMe = document.getElementById('rememberMe');
-  const tabBtns = document.querySelectorAll('.tab');
-  const panels = { products: document.getElementById('productsPanel'), settings: document.getElementById('settingsPanel') };
-  const prodName = document.getElementById('prodName'), prodPrice = document.getElementById('prodPrice'), prodCategory = document.getElementById('prodCategory');
-  const prodLabel = document.getElementById('prodLabel'), prodImage = document.getElementById('prodImage');
-  const addBtn = document.getElementById('addProductBtn'), cancelBtn = document.getElementById('cancelEditBtn');
-  const progressBar = document.getElementById('uploadProgress');
-  const tbody = document.querySelector('#productsTable tbody');
-  const waNumber = document.getElementById('waNumber'), phoneNumber = document.getElementById('phoneNumber');
-  const instaLink = document.getElementById('instaLink'), fbLink = document.getElementById('fbLink'), tiktokLink = document.getElementById('tiktokLink');
-  const saveSettingsBtn = document.getElementById('saveSettingsBtn'), settingsMsg = document.getElementById('settingsMsg');
-  
-  let currentEditId = null;
-
-  // ========== وظائف تذكرني (تشفير بسيط) ==========
-  function saveCredentials(email, password) {
-    const encodedEmail = btoa(email);
-    const encodedPass = btoa(password);
-    localStorage.setItem('dossa_rem', JSON.stringify({ e: encodedEmail, p: encodedPass }));
-  }
-  function loadCredentials() {
-    const saved = localStorage.getItem('dossa_rem');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        loginEmail.value = atob(data.e);
-        loginPassword.value = atob(data.p);
-        rememberMe.checked = true;
-      } catch(e) { /* تجاهل */ }
+    // تهيئة البيانات الافتراضية
+    if (!localStorage.getItem(STORAGE_PRODUCTS)) {
+      const defaultProducts = [
+        { id: '1', name: 'حذاء رياضي نايك', price: 1200, category: 'Sport', label: 'جديد', imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200&h=200&fit=crop', createdAt: Date.now() },
+        { id: '2', name: 'حذاء كاجوال جلد', price: 850, category: 'Casual', label: '', imageUrl: 'https://images.unsplash.com/photo-1460353581641-37baddab0fa2?w=200&h=200&fit=crop', createdAt: Date.now() - 10000 }
+      ];
+      localStorage.setItem(STORAGE_PRODUCTS, JSON.stringify(defaultProducts));
     }
-  }
-  function clearCredentials() {
-    localStorage.removeItem('dossa_rem');
-  }
-
-  // تحميل بيانات الدخول المحفوظة عند فتح الصفحة
-  loadCredentials();
-
-  // ========== تسجيل الدخول ==========
-  loginBtn.addEventListener('click', () => {
-    const email = loginEmail.value.trim();
-    const pass = loginPassword.value;
-    if (!email || !pass) {
-      loginError.textContent = 'الرجاء إدخال البريد وكلمة المرور';
-      return;
+    if (!localStorage.getItem(STORAGE_SETTINGS)) {
+      const defaultSettings = {
+        whatsappNumber: '201234567890',
+        phone: '0223456789',
+        instagram: 'https://instagram.com/dossa',
+        facebook: 'https://facebook.com/dossa',
+        tiktok: 'https://tiktok.com/@dossa'
+      };
+      localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(defaultSettings));
     }
-    auth.signInWithEmailAndPassword(email, pass)
-      .then(() => {
-        loginError.textContent = '';
-        if (rememberMe.checked) {
-          saveCredentials(email, pass);
-        } else {
-          clearCredentials();
-        }
+
+    // دوال مساعدة لمحاكاة API
+    const mockAPI = {
+      // منتجات
+      getProducts: () => {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const data = JSON.parse(localStorage.getItem(STORAGE_PRODUCTS)) || [];
+            resolve(data);
+          }, MOCK_DELAY);
+        });
+      },
+      addProduct: (product) => {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const products = JSON.parse(localStorage.getItem(STORAGE_PRODUCTS)) || [];
+            const newId = Date.now() + '' + Math.floor(Math.random() * 1000);
+            const newProduct = { ...product, id: newId, createdAt: Date.now() };
+            products.push(newProduct);
+            localStorage.setItem(STORAGE_PRODUCTS, JSON.stringify(products));
+            resolve(newProduct);
+          }, MOCK_DELAY);
+        });
+      },
+      updateProduct: (id, updates) => {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            const products = JSON.parse(localStorage.getItem(STORAGE_PRODUCTS)) || [];
+            const index = products.findIndex(p => p.id === id);
+            if (index === -1) return reject('المنتج غير موجود');
+            products[index] = { ...products[index], ...updates, updatedAt: Date.now() };
+            localStorage.setItem(STORAGE_PRODUCTS, JSON.stringify(products));
+            resolve(products[index]);
+          }, MOCK_DELAY);
+        });
+      },
+      deleteProduct: (id) => {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const products = JSON.parse(localStorage.getItem(STORAGE_PRODUCTS)) || [];
+            const filtered = products.filter(p => p.id !== id);
+            localStorage.setItem(STORAGE_PRODUCTS, JSON.stringify(filtered));
+            resolve(true);
+          }, MOCK_DELAY);
+        });
+      },
+      // إعدادات
+      getSettings: () => {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const data = JSON.parse(localStorage.getItem(STORAGE_SETTINGS)) || {};
+            resolve(data);
+          }, MOCK_DELAY);
+        });
+      },
+      saveSettings: (settings) => {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(settings));
+            resolve(settings);
+          }, MOCK_DELAY);
+        });
+      }
+    };
+
+    // ------------------- منطق التطبيق (باستخدام Mock API) -------------------
+    const loginScreen = document.getElementById('loginScreen');
+    const dashboardScreen = document.getElementById('dashboardScreen');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const loginError = document.getElementById('loginError');
+    const tabBtns = document.querySelectorAll('.tab');
+    const panels = { 
+      products: document.getElementById('productsPanel'), 
+      settings: document.getElementById('settingsPanel') 
+    };
+    const prodName = document.getElementById('prodName');
+    const prodPrice = document.getElementById('prodPrice');
+    const prodCategory = document.getElementById('prodCategory');
+    const prodLabel = document.getElementById('prodLabel');
+    const prodImage = document.getElementById('prodImage');
+    const addBtn = document.getElementById('addProductBtn');
+    const cancelBtn = document.getElementById('cancelEditBtn');
+    const progressBar = document.getElementById('uploadProgress');
+    const tbody = document.querySelector('#productsTable tbody');
+    const waNumber = document.getElementById('waNumber');
+    const phoneNumber = document.getElementById('phoneNumber');
+    const instaLink = document.getElementById('instaLink');
+    const fbLink = document.getElementById('fbLink');
+    const tiktokLink = document.getElementById('tiktokLink');
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    const settingsMsg = document.getElementById('settingsMsg');
+
+    let currentEditId = null;
+    let isLoggedIn = false;
+
+    // --- المصادقة البسيطة (ثابتة للتجربة) ---
+    const VALID_EMAIL = 'admin@dossa.com';
+    const VALID_PASSWORD = 'admin123';
+
+    loginBtn.addEventListener('click', () => {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPassword').value;
+      if (email === VALID_EMAIL && pass === VALID_PASSWORD) {
+        isLoggedIn = true;
         loginScreen.style.display = 'none';
         dashboardScreen.style.display = 'block';
         loadProductsTable();
         loadSettingsForm();
-      })
-      .catch(err => {
-        loginError.textContent = 'خطأ: ' + err.message;
-      });
-  });
+        loginError.textContent = '';
+      } else {
+        loginError.textContent = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+      }
+    });
 
-  // تسجيل الخروج
-  logoutBtn.addEventListener('click', () => {
-    auth.signOut();
-    clearCredentials(); // إزالة الحفظ عند الخروج اليدوي
-  });
-
-  // مراقبة حالة المصادقة
-  auth.onAuthStateChanged(user => {
-    if (user) {
-      loginScreen.style.display = 'none';
-      dashboardScreen.style.display = 'block';
-      loadProductsTable();
-      loadSettingsForm();
-    } else {
+    logoutBtn.addEventListener('click', () => {
+      isLoggedIn = false;
       dashboardScreen.style.display = 'none';
       loginScreen.style.display = 'flex';
-      // لا نمسح بيانات التذكر عند الخروج التلقائي (انتهاء الجلسة)، فقط عند الضغط على زر الخروج
-    }
-  });
-
-  // ========== التبويبات ==========
-  tabBtns.forEach(btn => btn.addEventListener('click', () => {
-    tabBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    panels.products.style.display = btn.dataset.tab === 'products' ? 'block' : 'none';
-    panels.settings.style.display = btn.dataset.tab === 'settings' ? 'block' : 'none';
-  }));
-
-  // ========== تحميل المنتجات ==========
-  function loadProductsTable() {
-    db.ref('products').on('value', snap => {
-      let html = '';
-      snap.forEach(child => {
-        const p = child.val();
-        html += `<tr>
-          <td><img src="${p.imageUrl||''}" class="product-thumb"></td>
-          <td>${p.name}</td>
-          <td>${p.price} ج.م</td>
-          <td>${p.category}</td>
-          <td>${p.label||'-'}</td>
-          <td class="action-icons">
-            <i class="fas fa-edit" onclick="editProduct('${child.key}')"></i>
-            <i class="fas fa-trash-alt" onclick="deleteProduct('${child.key}')"></i>
-          </td>
-        </tr>`;
-      });
-      tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;padding:30px;">لا توجد منتجات</td></tr>';
+      document.getElementById('loginPassword').value = '';
     });
-  }
 
-  // تعديل منتج
-  window.editProduct = async (id) => {
-    const snap = await db.ref('products/'+id).get();
-    const p = snap.val();
-    prodName.value = p.name;
-    prodPrice.value = p.price;
-    prodCategory.value = p.category;
-    prodLabel.value = p.label || '';
-    currentEditId = id;
-    addBtn.innerHTML = '<i class="fas fa-save"></i> تحديث المنتج';
-    cancelBtn.style.display = 'inline-block';
-  };
-
-  // حذف منتج
-  window.deleteProduct = (id) => {
-    if (confirm('متأكد من حذف هذا المنتج؟')) {
-      db.ref('products/'+id).remove();
-    }
-  };
-
-  // إلغاء التعديل
-  cancelBtn.onclick = () => {
-    currentEditId = null;
-    addBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> إضافة المنتج';
-    cancelBtn.style.display = 'none';
-    prodName.value = prodPrice.value = prodLabel.value = '';
-    prodImage.value = '';
-    progressBar.style.width = '0%';
-  };
-
-  // ========== إضافة / تحديث المنتج (المنطق المُصلح) ==========
-  addBtn.onclick = async () => {
-    // التحقق من الحقول المطلوبة
-    if (!prodName.value.trim() || !prodPrice.value) {
-      alert('الرجاء إدخال اسم المنتج والسعر');
-      return;
+    // التحقق من الجلسة عند التحميل (محاكاة)
+    if (!isLoggedIn) {
+      dashboardScreen.style.display = 'none';
+      loginScreen.style.display = 'flex';
     }
 
-    const file = prodImage.files[0];
-    
-    // في حالة إضافة منتج جديد: يجب وجود صورة
-    if (!currentEditId && !file) {
-      alert('الرجاء اختيار صورة للمنتج الجديد');
-      return;
-    }
+    // التبويبات
+    tabBtns.forEach(btn => btn.addEventListener('click', () => {
+      tabBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      panels.products.style.display = tab === 'products' ? 'block' : 'none';
+      panels.settings.style.display = tab === 'settings' ? 'block' : 'none';
+    }));
 
-    // إذا كان تعديلاً ولم يتم اختيار صورة جديدة، نأخذ الرابط القديم
-    if (currentEditId && !file) {
+    // --- تحميل جدول المنتجات ---
+    async function loadProductsTable() {
       try {
-        const oldSnap = await db.ref('products/' + currentEditId).get();
-        const oldData = oldSnap.val();
-        if (oldData) {
-          saveProductData(oldData.imageUrl || '');
-        } else {
-          alert('المنتج غير موجود');
-        }
+        const products = await mockAPI.getProducts();
+        let html = '';
+        products.forEach(p => {
+          html += `<tr>
+            <td><img src="${p.imageUrl || ''}" class="product-thumb" onerror="this.src='https://via.placeholder.com/60?text=No+Img'"></td>
+            <td>${p.name}</td>
+            <td>${p.price} ج.م</td>
+            <td>${p.category}</td>
+            <td>${p.label || '-'}</td>
+            <td class="action-icons">
+              <i class="fas fa-edit" onclick="editProduct('${p.id}')"></i>
+              <i class="fas fa-trash-alt" onclick="deleteProduct('${p.id}')"></i>
+            </td>
+          </tr>`;
+        });
+        tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;padding:20px;">لا توجد منتجات</td></tr>';
       } catch (err) {
-        alert('خطأ في جلب بيانات المنتج: ' + err.message);
+        alert('فشل تحميل المنتجات: ' + err);
       }
-      return;
     }
 
-    // رفع الصورة الجديدة (سواء إضافة جديدة أو تعديل مع صورة جديدة)
-    const storageRef = storage.ref(`sneakers/${Date.now()}_${file.name}`);
-    const uploadTask = storageRef.put(file);
-
-    uploadTask.on('state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        progressBar.style.width = progress + '%';
-      },
-      (error) => {
-        alert('فشل رفع الصورة: ' + error.message);
-        progressBar.style.width = '0%';
-      },
-      async () => {
-        const imageUrl = await uploadTask.snapshot.ref.getDownloadURL();
-        saveProductData(imageUrl);
+    // --- تعديل منتج ---
+    window.editProduct = async (id) => {
+      try {
+        const products = await mockAPI.getProducts();
+        const p = products.find(prod => prod.id === id);
+        if (!p) return;
+        prodName.value = p.name;
+        prodPrice.value = p.price;
+        prodCategory.value = p.category;
+        prodLabel.value = p.label || '';
+        currentEditId = id;
+        addBtn.innerHTML = '<i class="fas fa-save"></i> تحديث المنتج';
+        cancelBtn.style.display = 'inline-block';
+        // نترك الصورة فارغة؛ سنتعامل معها عند الحفظ
+      } catch (err) {
+        alert('خطأ: ' + err);
       }
-    );
-  };
-
-  // دالة حفظ البيانات بعد الحصول على رابط الصورة
-  async function saveProductData(imageUrl) {
-    const product = {
-      name: prodName.value.trim(),
-      price: Number(prodPrice.value),
-      category: prodCategory.value,
-      label: prodLabel.value.trim() || '',
-      imageUrl: imageUrl,
     };
 
-    try {
-      if (currentEditId) {
-        await db.ref('products/' + currentEditId).update(product);
-      } else {
-        product.createdAt = firebase.database.ServerValue.TIMESTAMP;
-        await db.ref('products').push(product);
+    // --- حذف منتج ---
+    window.deleteProduct = async (id) => {
+      if (!confirm('متأكد من حذف المنتج؟')) return;
+      try {
+        await mockAPI.deleteProduct(id);
+        await loadProductsTable();
+      } catch (err) {
+        alert('فشل الحذف: ' + err);
       }
-      // إعادة تعيين النموذج
-      cancelBtn.click();
+    };
+
+    // --- إلغاء التعديل ---
+    cancelBtn.onclick = () => {
+      currentEditId = null;
+      addBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> إضافة المنتج';
+      cancelBtn.style.display = 'none';
+      prodName.value = prodPrice.value = prodLabel.value = '';
+      prodImage.value = '';
       progressBar.style.width = '0%';
-    } catch (error) {
-      alert('حدث خطأ أثناء الحفظ: ' + error.message);
-    }
-  }
+    };
 
-  // ========== إعدادات التواصل ==========
-  async function loadSettingsForm() {
-    const snap = await db.ref('settings/contactInfo').get();
-    if (snap.exists()) {
-      const d = snap.val();
-      waNumber.value = d.whatsappNumber || '';
-      phoneNumber.value = d.phone || '';
-      instaLink.value = d.instagram || '';
-      fbLink.value = d.facebook || '';
-      tiktokLink.value = d.tiktok || '';
+    // --- تحويل الصورة إلى Base64 (محاكاة رفع) ---
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
     }
-  }
 
-  saveSettingsBtn.onclick = async () => {
-    await db.ref('settings/contactInfo').set({
-      whatsappNumber: waNumber.value.trim(),
-      phone: phoneNumber.value.trim(),
-      instagram: instaLink.value.trim(),
-      facebook: fbLink.value.trim(),
-      tiktok: tiktokLink.value.trim()
-    });
-    settingsMsg.textContent = 'تم حفظ الإعدادات بنجاح ✓';
-    setTimeout(() => settingsMsg.textContent = '', 3000);
-  };
+    // --- إضافة / تحديث المنتج ---
+    addBtn.onclick = async () => {
+      if (!prodName.value.trim() || !prodPrice.value) {
+        alert('الاسم والسعر مطلوبان');
+        return;
+      }
+
+      const file = prodImage.files[0];
+      let imageUrl = '';
+
+      // محاكاة شريط التقدم
+      progressBar.style.width = '0%';
+      const progressInterval = setInterval(() => {
+        let w = parseFloat(progressBar.style.width) || 0;
+        if (w < 90) progressBar.style.width = (w + 10) + '%';
+      }, 100);
+
+      try {
+        // إذا كان تعديل ولم يتم اختيار صورة جديدة، نحافظ على الصورة القديمة
+        if (currentEditId && !file) {
+          const products = await mockAPI.getProducts();
+          const oldProduct = products.find(p => p.id === currentEditId);
+          imageUrl = oldProduct ? oldProduct.imageUrl : '';
+        } else if (file) {
+          // تحويل الصورة إلى Base64 لتخزينها محلياً
+          imageUrl = await fileToBase64(file);
+        } else {
+          // إضافة جديدة بدون صورة
+          imageUrl = '';
+        }
+
+        const productData = {
+          name: prodName.value.trim(),
+          price: Number(prodPrice.value),
+          category: prodCategory.value,
+          label: prodLabel.value || '',
+          imageUrl: imageUrl
+        };
+
+        if (currentEditId) {
+          await mockAPI.updateProduct(currentEditId, productData);
+        } else {
+          await mockAPI.addProduct(productData);
+        }
+
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        setTimeout(() => progressBar.style.width = '0%', 500);
+
+        cancelBtn.click(); // إعادة تعيين النموذج
+        await loadProductsTable();
+      } catch (error) {
+        clearInterval(progressInterval);
+        progressBar.style.width = '0%';
+        alert('حدث خطأ: ' + error.message);
+      }
+    };
+
+    // --- تحميل إعدادات التواصل ---
+    async function loadSettingsForm() {
+      try {
+        const settings = await mockAPI.getSettings();
+        waNumber.value = settings.whatsappNumber || '';
+        phoneNumber.value = settings.phone || '';
+        instaLink.value = settings.instagram || '';
+        fbLink.value = settings.facebook || '';
+        tiktokLink.value = settings.tiktok || '';
+      } catch (err) {
+        console.warn('فشل تحميل الإعدادات', err);
+      }
+    }
+
+    // --- حفظ الإعدادات ---
+    saveSettingsBtn.onclick = async () => {
+      const settings = {
+        whatsappNumber: waNumber.value.trim(),
+        phone: phoneNumber.value.trim(),
+        instagram: instaLink.value.trim(),
+        facebook: fbLink.value.trim(),
+        tiktok: tiktokLink.value.trim()
+      };
+      try {
+        await mockAPI.saveSettings(settings);
+        settingsMsg.textContent = 'تم الحفظ بنجاح ✓';
+        setTimeout(() => settingsMsg.textContent = '', 3000);
+      } catch (err) {
+        settingsMsg.textContent = 'فشل الحفظ!';
+        settingsMsg.style.color = '#ff4d4d';
+        setTimeout(() => { settingsMsg.textContent = ''; settingsMsg.style.color = '#0f0'; }, 3000);
+      }
+    };
+
+    // تعريض دوال التعديل والحذف للنطاق العام (للاستدعاء من onclick)
+    window.editProduct = editProduct;
+    window.deleteProduct = deleteProduct;
+
+    // تحميل أولي للوحة التحكم إذا كان مسجلاً (للتجربة نتركه مخفي حتى تسجيل الدخول)
+    // لكن نضمن أنه في حالة وجود تسجيل سابق (محاكاة) لا شيء
+  })();
 </script>
 </body>
 </html>
