@@ -11,6 +11,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <style>
+    /* نفس التنسيقات السابقة دون تغيير */
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family: 'Plus Jakarta Sans', sans-serif; background:#0A0E14; color:#E0E0E0; min-height:100vh; display:flex; align-items:center; justify-content:center; }
     #loginScreen { background:#111C26; padding:40px; border-radius:32px; width:100%; max-width:420px; border:1px solid #2A3A4A; }
@@ -50,8 +51,8 @@
 
 <div id="loginScreen">
   <h2><i class="fas fa-lock"></i> دخول المشرف</h2>
-  <div class="input-group"><input type="email" id="loginEmail" placeholder="البريد الإلكتروني" value="admin@dossa.com"></div>
-  <div class="input-group"><input type="password" id="loginPassword" placeholder="كلمة المرور" value="dossa123789123789"></div>
+  <div class="input-group"><input type="email" id="loginEmail" placeholder="البريد الإلكتروني"></div> <!-- تم إزالة القيمة الافتراضية -->
+  <div class="input-group"><input type="password" id="loginPassword" placeholder="كلمة المرور"></div> <!-- تم إزالة القيمة الافتراضية -->
   <button class="btn-login" id="loginBtn">تسجيل الدخول</button>
   <div class="error-msg" id="loginError"></div>
 </div>
@@ -128,6 +129,7 @@
   const saveSettingsBtn = document.getElementById('saveSettingsBtn'), settingsMsg = document.getElementById('settingsMsg');
   let currentEditId = null;
 
+  // تسجيل الدخول
   loginBtn.addEventListener('click', () => {
     auth.signInWithEmailAndPassword(document.getElementById('loginEmail').value, document.getElementById('loginPassword').value)
       .then(() => { loginScreen.style.display='none'; dashboardScreen.style.display='block'; loadProductsTable(); loadSettingsForm(); })
@@ -139,12 +141,14 @@
     else { dashboardScreen.style.display='none'; loginScreen.style.display='flex'; }
   });
 
+  // التبويبات
   tabBtns.forEach(btn => btn.addEventListener('click', () => {
     tabBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active');
     panels.products.style.display = btn.dataset.tab === 'products' ? 'block' : 'none';
     panels.settings.style.display = btn.dataset.tab === 'settings' ? 'block' : 'none';
   }));
 
+  // تحميل جدول المنتجات
   function loadProductsTable() {
     db.ref('products').on('value', snap => {
       let html = '';
@@ -156,52 +160,122 @@
       tbody.innerHTML = html;
     });
   }
+
+  // تعديل منتج
   window.editProduct = async (id) => {
     const snap = await db.ref('products/'+id).get();
     const p = snap.val();
     prodName.value = p.name; prodPrice.value = p.price; prodCategory.value = p.category; prodLabel.value = p.label||'';
     currentEditId = id; addBtn.innerHTML = '<i class="fas fa-save"></i> تحديث المنتج'; cancelBtn.style.display='inline-block';
   };
+
+  // حذف منتج
   window.deleteProduct = (id) => { if(confirm('متأكد؟')) db.ref('products/'+id).remove(); };
+
+  // إلغاء التعديل
   cancelBtn.onclick = () => {
-    currentEditId=null; addBtn.innerHTML='<i class="fas fa-cloud-upload-alt"></i> إضافة المنتج'; cancelBtn.style.display='none';
-    prodName.value=prodPrice.value=prodLabel.value=''; prodImage.value=''; progressBar.style.width='0%';
+    currentEditId = null; 
+    addBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> إضافة المنتج'; 
+    cancelBtn.style.display = 'none';
+    prodName.value = prodPrice.value = prodLabel.value = ''; 
+    prodImage.value = ''; 
+    progressBar.style.width = '0%';
   };
+
+  // إضافة / تحديث المنتج
   addBtn.onclick = async () => {
+    if (!prodName.value || !prodPrice.value) {
+      alert('الاسم والسعر مطلوبان');
+      return;
+    }
+
     const file = prodImage.files[0];
-    if(!prodName.value||!prodPrice.value) return alert('الاسم والسعر مطلوبان');
     let imageUrl = '';
-    if(file) {
-      const storageRef = storage.ref(`sneakers/${Date.now()}_${file.name}`);
-      const task = storageRef.put(file);
-      task.on('state_changed', snap => progressBar.style.width = (snap.bytesTransferred/snap.totalBytes)*100+'%',
-        err => alert('خطأ في الرفع'),
-        async () => { imageUrl = await task.snapshot.ref.getDownloadURL(); saveProduct(imageUrl); });
-    } else if(currentEditId) {
-      imageUrl = (await db.ref('products/'+currentEditId).get()).val().imageUrl;
-      saveProduct(imageUrl);
-    } else alert('الرجاء اختيار صورة');
+
+    // إذا كنا في وضع تعديل ولم نختر صورة جديدة، نستخدم الرابط القديم
+    if (currentEditId && !file) {
+      const oldSnap = await db.ref('products/' + currentEditId).get();
+      imageUrl = oldSnap.val().imageUrl || '';
+      saveProductData(imageUrl);
+      return;
+    }
+
+    // إذا لم نختر صورة وفي وضع إضافة جديدة → خطأ
+    if (!file && !currentEditId) {
+      alert('الرجاء اختيار صورة للمنتج الجديد');
+      return;
+    }
+
+    // رفع الصورة
+    const storageRef = storage.ref(`sneakers/${Date.now()}_${file.name}`);
+    const uploadTask = storageRef.put(file);
+
+    uploadTask.on('state_changed', 
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        progressBar.style.width = progress + '%';
+      },
+      (error) => {
+        alert('فشل رفع الصورة: ' + error.message);
+        progressBar.style.width = '0%';
+      },
+      async () => {
+        imageUrl = await uploadTask.snapshot.ref.getDownloadURL();
+        saveProductData(imageUrl);
+      }
+    );
   };
-  async function saveProduct(imageUrl) {
-    const product = { name: prodName.value, price: Number(prodPrice.value), category: prodCategory.value, label: prodLabel.value, imageUrl, createdAt: Date.now() };
-    if(currentEditId) db.ref('products/'+currentEditId).update(product);
-    else db.ref('products').push(product);
-    progressBar.style.width='0%'; cancelBtn.click();
+
+  // دالة موحدة لحفظ بيانات المنتج
+  async function saveProductData(imageUrl) {
+    const product = {
+      name: prodName.value,
+      price: Number(prodPrice.value),
+      category: prodCategory.value,
+      label: prodLabel.value || '',
+      imageUrl: imageUrl,
+      updatedAt: Date.now()
+    };
+
+    try {
+      if (currentEditId) {
+        await db.ref('products/' + currentEditId).update(product);
+      } else {
+        product.createdAt = Date.now();
+        await db.ref('products').push(product);
+      }
+      // إعادة تعيين النموذج
+      cancelBtn.click();
+      progressBar.style.width = '0%';
+    } catch (error) {
+      alert('حدث خطأ أثناء الحفظ: ' + error.message);
+    }
   }
+
+  // تحميل إعدادات التواصل
   async function loadSettingsForm() {
     const snap = await db.ref('settings/contactInfo').get();
     if(snap.exists()) {
       const d = snap.val();
-      waNumber.value = d.whatsappNumber||''; phoneNumber.value = d.phone||'';
-      instaLink.value = d.instagram||''; fbLink.value = d.facebook||''; tiktokLink.value = d.tiktok||'';
+      waNumber.value = d.whatsappNumber || '';
+      phoneNumber.value = d.phone || '';
+      instaLink.value = d.instagram || '';
+      fbLink.value = d.facebook || '';
+      tiktokLink.value = d.tiktok || '';
     }
   }
+
+  // حفظ الإعدادات
   saveSettingsBtn.onclick = async () => {
     await db.ref('settings/contactInfo').set({
-      whatsappNumber: waNumber.value, phone: phoneNumber.value,
-      instagram: instaLink.value, facebook: fbLink.value, tiktok: tiktokLink.value
+      whatsappNumber: waNumber.value,
+      phone: phoneNumber.value,
+      instagram: instaLink.value,
+      facebook: fbLink.value,
+      tiktok: tiktokLink.value
     });
-    settingsMsg.textContent = 'تم الحفظ ✓'; setTimeout(()=>settingsMsg.textContent='',3000);
+    settingsMsg.textContent = 'تم الحفظ ✓';
+    setTimeout(() => settingsMsg.textContent = '', 3000);
   };
 </script>
 </body>
