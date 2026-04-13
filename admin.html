@@ -45,14 +45,19 @@
     .progress-bar { height:100%; width:0%; background:#00D2FF; border-radius:6px; }
     .social-inputs { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
     #settingsMsg { margin-top:20px; color:#0f0; }
+    .remember-me { display:flex; align-items:center; margin-bottom:20px; color:#ccc; }
+    .remember-me input { margin-left:10px; width:18px; height:18px; accent-color:#00D2FF; }
   </style>
 </head>
 <body>
 
 <div id="loginScreen">
   <h2><i class="fas fa-lock"></i> دخول المشرف</h2>
-  <div class="input-group"><input type="email" id="loginEmail" placeholder="البريد الإلكتروني"></div> <!-- تم إزالة القيمة الافتراضية -->
-  <div class="input-group"><input type="password" id="loginPassword" placeholder="كلمة المرور"></div> <!-- تم إزالة القيمة الافتراضية -->
+  <div class="input-group"><input type="email" id="loginEmail" placeholder="البريد الإلكتروني" autocomplete="email"></div>
+  <div class="input-group"><input type="password" id="loginPassword" placeholder="كلمة المرور" autocomplete="current-password"></div>
+  <div class="remember-me">
+    <input type="checkbox" id="rememberMe"> <label for="rememberMe">تذكرني</label>
+  </div>
   <button class="btn-login" id="loginBtn">تسجيل الدخول</button>
   <div class="error-msg" id="loginError"></div>
 </div>
@@ -112,11 +117,15 @@
   const storage = firebase.storage();
   const auth = firebase.auth();
 
+  // عناصر DOM
   const loginScreen = document.getElementById('loginScreen');
   const dashboardScreen = document.getElementById('dashboardScreen');
   const loginBtn = document.getElementById('loginBtn');
   const logoutBtn = document.getElementById('logoutBtn');
   const loginError = document.getElementById('loginError');
+  const loginEmail = document.getElementById('loginEmail');
+  const loginPassword = document.getElementById('loginPassword');
+  const rememberMe = document.getElementById('rememberMe');
   const tabBtns = document.querySelectorAll('.tab');
   const panels = { products: document.getElementById('productsPanel'), settings: document.getElementById('settingsPanel') };
   const prodName = document.getElementById('prodName'), prodPrice = document.getElementById('prodPrice'), prodCategory = document.getElementById('prodCategory');
@@ -127,37 +136,106 @@
   const waNumber = document.getElementById('waNumber'), phoneNumber = document.getElementById('phoneNumber');
   const instaLink = document.getElementById('instaLink'), fbLink = document.getElementById('fbLink'), tiktokLink = document.getElementById('tiktokLink');
   const saveSettingsBtn = document.getElementById('saveSettingsBtn'), settingsMsg = document.getElementById('settingsMsg');
+  
   let currentEditId = null;
 
-  // تسجيل الدخول
+  // ========== وظائف تذكرني (تشفير بسيط) ==========
+  function saveCredentials(email, password) {
+    const encodedEmail = btoa(email);
+    const encodedPass = btoa(password);
+    localStorage.setItem('dossa_rem', JSON.stringify({ e: encodedEmail, p: encodedPass }));
+  }
+  function loadCredentials() {
+    const saved = localStorage.getItem('dossa_rem');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        loginEmail.value = atob(data.e);
+        loginPassword.value = atob(data.p);
+        rememberMe.checked = true;
+      } catch(e) { /* تجاهل */ }
+    }
+  }
+  function clearCredentials() {
+    localStorage.removeItem('dossa_rem');
+  }
+
+  // تحميل بيانات الدخول المحفوظة عند فتح الصفحة
+  loadCredentials();
+
+  // ========== تسجيل الدخول ==========
   loginBtn.addEventListener('click', () => {
-    auth.signInWithEmailAndPassword(document.getElementById('loginEmail').value, document.getElementById('loginPassword').value)
-      .then(() => { loginScreen.style.display='none'; dashboardScreen.style.display='block'; loadProductsTable(); loadSettingsForm(); })
-      .catch(err => { loginError.textContent = 'خطأ: ' + err.message; });
-  });
-  logoutBtn.addEventListener('click', () => auth.signOut());
-  auth.onAuthStateChanged(user => {
-    if (user) { loginScreen.style.display='none'; dashboardScreen.style.display='block'; loadProductsTable(); loadSettingsForm(); }
-    else { dashboardScreen.style.display='none'; loginScreen.style.display='flex'; }
+    const email = loginEmail.value.trim();
+    const pass = loginPassword.value;
+    if (!email || !pass) {
+      loginError.textContent = 'الرجاء إدخال البريد وكلمة المرور';
+      return;
+    }
+    auth.signInWithEmailAndPassword(email, pass)
+      .then(() => {
+        loginError.textContent = '';
+        if (rememberMe.checked) {
+          saveCredentials(email, pass);
+        } else {
+          clearCredentials();
+        }
+        loginScreen.style.display = 'none';
+        dashboardScreen.style.display = 'block';
+        loadProductsTable();
+        loadSettingsForm();
+      })
+      .catch(err => {
+        loginError.textContent = 'خطأ: ' + err.message;
+      });
   });
 
-  // التبويبات
+  // تسجيل الخروج
+  logoutBtn.addEventListener('click', () => {
+    auth.signOut();
+    clearCredentials(); // إزالة الحفظ عند الخروج اليدوي
+  });
+
+  // مراقبة حالة المصادقة
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      loginScreen.style.display = 'none';
+      dashboardScreen.style.display = 'block';
+      loadProductsTable();
+      loadSettingsForm();
+    } else {
+      dashboardScreen.style.display = 'none';
+      loginScreen.style.display = 'flex';
+      // لا نمسح بيانات التذكر عند الخروج التلقائي (انتهاء الجلسة)، فقط عند الضغط على زر الخروج
+    }
+  });
+
+  // ========== التبويبات ==========
   tabBtns.forEach(btn => btn.addEventListener('click', () => {
-    tabBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active');
+    tabBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
     panels.products.style.display = btn.dataset.tab === 'products' ? 'block' : 'none';
     panels.settings.style.display = btn.dataset.tab === 'settings' ? 'block' : 'none';
   }));
 
-  // تحميل جدول المنتجات
+  // ========== تحميل المنتجات ==========
   function loadProductsTable() {
     db.ref('products').on('value', snap => {
       let html = '';
       snap.forEach(child => {
         const p = child.val();
-        html += `<tr><td><img src="${p.imageUrl||''}" class="product-thumb"></td><td>${p.name}</td><td>${p.price} ج.م</td><td>${p.category}</td><td>${p.label||'-'}</td>
-          <td class="action-icons"><i class="fas fa-edit" onclick="editProduct('${child.key}')"></i><i class="fas fa-trash-alt" onclick="deleteProduct('${child.key}')"></i></td></tr>`;
+        html += `<tr>
+          <td><img src="${p.imageUrl||''}" class="product-thumb"></td>
+          <td>${p.name}</td>
+          <td>${p.price} ج.م</td>
+          <td>${p.category}</td>
+          <td>${p.label||'-'}</td>
+          <td class="action-icons">
+            <i class="fas fa-edit" onclick="editProduct('${child.key}')"></i>
+            <i class="fas fa-trash-alt" onclick="deleteProduct('${child.key}')"></i>
+          </td>
+        </tr>`;
       });
-      tbody.innerHTML = html;
+      tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;padding:30px;">لا توجد منتجات</td></tr>';
     });
   }
 
@@ -165,52 +243,69 @@
   window.editProduct = async (id) => {
     const snap = await db.ref('products/'+id).get();
     const p = snap.val();
-    prodName.value = p.name; prodPrice.value = p.price; prodCategory.value = p.category; prodLabel.value = p.label||'';
-    currentEditId = id; addBtn.innerHTML = '<i class="fas fa-save"></i> تحديث المنتج'; cancelBtn.style.display='inline-block';
+    prodName.value = p.name;
+    prodPrice.value = p.price;
+    prodCategory.value = p.category;
+    prodLabel.value = p.label || '';
+    currentEditId = id;
+    addBtn.innerHTML = '<i class="fas fa-save"></i> تحديث المنتج';
+    cancelBtn.style.display = 'inline-block';
   };
 
   // حذف منتج
-  window.deleteProduct = (id) => { if(confirm('متأكد؟')) db.ref('products/'+id).remove(); };
+  window.deleteProduct = (id) => {
+    if (confirm('متأكد من حذف هذا المنتج؟')) {
+      db.ref('products/'+id).remove();
+    }
+  };
 
   // إلغاء التعديل
   cancelBtn.onclick = () => {
-    currentEditId = null; 
-    addBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> إضافة المنتج'; 
+    currentEditId = null;
+    addBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> إضافة المنتج';
     cancelBtn.style.display = 'none';
-    prodName.value = prodPrice.value = prodLabel.value = ''; 
-    prodImage.value = ''; 
+    prodName.value = prodPrice.value = prodLabel.value = '';
+    prodImage.value = '';
     progressBar.style.width = '0%';
   };
 
-  // إضافة / تحديث المنتج
+  // ========== إضافة / تحديث المنتج (المنطق المُصلح) ==========
   addBtn.onclick = async () => {
-    if (!prodName.value || !prodPrice.value) {
-      alert('الاسم والسعر مطلوبان');
+    // التحقق من الحقول المطلوبة
+    if (!prodName.value.trim() || !prodPrice.value) {
+      alert('الرجاء إدخال اسم المنتج والسعر');
       return;
     }
 
     const file = prodImage.files[0];
-    let imageUrl = '';
-
-    // إذا كنا في وضع تعديل ولم نختر صورة جديدة، نستخدم الرابط القديم
-    if (currentEditId && !file) {
-      const oldSnap = await db.ref('products/' + currentEditId).get();
-      imageUrl = oldSnap.val().imageUrl || '';
-      saveProductData(imageUrl);
-      return;
-    }
-
-    // إذا لم نختر صورة وفي وضع إضافة جديدة → خطأ
-    if (!file && !currentEditId) {
+    
+    // في حالة إضافة منتج جديد: يجب وجود صورة
+    if (!currentEditId && !file) {
       alert('الرجاء اختيار صورة للمنتج الجديد');
       return;
     }
 
-    // رفع الصورة
+    // إذا كان تعديلاً ولم يتم اختيار صورة جديدة، نأخذ الرابط القديم
+    if (currentEditId && !file) {
+      try {
+        const oldSnap = await db.ref('products/' + currentEditId).get();
+        const oldData = oldSnap.val();
+        if (oldData) {
+          saveProductData(oldData.imageUrl || '');
+        } else {
+          alert('المنتج غير موجود');
+        }
+      } catch (err) {
+        alert('خطأ في جلب بيانات المنتج: ' + err.message);
+      }
+      return;
+    }
+
+    // رفع الصورة الجديدة (سواء إضافة جديدة أو تعديل مع صورة جديدة)
     const storageRef = storage.ref(`sneakers/${Date.now()}_${file.name}`);
     const uploadTask = storageRef.put(file);
 
-    uploadTask.on('state_changed', 
+    uploadTask.on('state_changed',
       (snapshot) => {
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
         progressBar.style.width = progress + '%';
@@ -220,28 +315,27 @@
         progressBar.style.width = '0%';
       },
       async () => {
-        imageUrl = await uploadTask.snapshot.ref.getDownloadURL();
+        const imageUrl = await uploadTask.snapshot.ref.getDownloadURL();
         saveProductData(imageUrl);
       }
     );
   };
 
-  // دالة موحدة لحفظ بيانات المنتج
+  // دالة حفظ البيانات بعد الحصول على رابط الصورة
   async function saveProductData(imageUrl) {
     const product = {
-      name: prodName.value,
+      name: prodName.value.trim(),
       price: Number(prodPrice.value),
       category: prodCategory.value,
-      label: prodLabel.value || '',
+      label: prodLabel.value.trim() || '',
       imageUrl: imageUrl,
-      updatedAt: Date.now()
     };
 
     try {
       if (currentEditId) {
         await db.ref('products/' + currentEditId).update(product);
       } else {
-        product.createdAt = Date.now();
+        product.createdAt = firebase.database.ServerValue.TIMESTAMP;
         await db.ref('products').push(product);
       }
       // إعادة تعيين النموذج
@@ -252,10 +346,10 @@
     }
   }
 
-  // تحميل إعدادات التواصل
+  // ========== إعدادات التواصل ==========
   async function loadSettingsForm() {
     const snap = await db.ref('settings/contactInfo').get();
-    if(snap.exists()) {
+    if (snap.exists()) {
       const d = snap.val();
       waNumber.value = d.whatsappNumber || '';
       phoneNumber.value = d.phone || '';
@@ -265,16 +359,15 @@
     }
   }
 
-  // حفظ الإعدادات
   saveSettingsBtn.onclick = async () => {
     await db.ref('settings/contactInfo').set({
-      whatsappNumber: waNumber.value,
-      phone: phoneNumber.value,
-      instagram: instaLink.value,
-      facebook: fbLink.value,
-      tiktok: tiktokLink.value
+      whatsappNumber: waNumber.value.trim(),
+      phone: phoneNumber.value.trim(),
+      instagram: instaLink.value.trim(),
+      facebook: fbLink.value.trim(),
+      tiktok: tiktokLink.value.trim()
     });
-    settingsMsg.textContent = 'تم الحفظ ✓';
+    settingsMsg.textContent = 'تم حفظ الإعدادات بنجاح ✓';
     setTimeout(() => settingsMsg.textContent = '', 3000);
   };
 </script>
