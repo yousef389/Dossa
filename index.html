@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>DOSSA • أسلوبك يبدأ من هنا</title>
+  <!-- الخطوط والأيقونات -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- Firebase SDKs (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+  <!-- GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0A0A0A;
+      color: #FFFFFF;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+    .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+    .glow-text { color: #00D2FF; text-shadow: 0 0 20px rgba(0,210,255,0.5); }
+    .btn-glow {
+      background: #00D2FF;
+      color: #0A0A0A;
+      font-weight: 700;
+      padding: 16px 40px;
+      border-radius: 60px;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 30px rgba(0,210,255,0.3);
+      display: inline-block;
+      text-decoration: none;
+    }
+    .btn-glow:hover {
+      background: #00b0d6;
+      box-shadow: 0 0 50px rgba(0,210,255,0.7);
+      transform: scale(1.05);
+    }
+    .footprint-bg {
+      position: absolute;
+      opacity: 0.02;
+      font-size: 400px;
+      color: #00D2FF;
+      user-select: none;
+      pointer-events: none;
+      z-index: 0;
+    }
+    section { padding: 100px 0; position: relative; overflow: hidden; }
+    h2 { font-size: 3.5rem; font-weight: 800; margin-bottom: 48px; letter-spacing: -0.02em; }
+    h2 i { color: #00D2FF; margin-left: 10px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 0;
+      position: relative;
+      z-index: 10;
+    }
+    .logo { font-size: 2.5rem; font-weight: 800; letter-spacing: 4px; }
+    .social-links a {
+      color: #FFFFFF;
+      margin: 0 12px;
+      font-size: 1.4rem;
+      transition: 0.2s;
+    }
+    .social-links a:hover { color: #00D2FF; text-shadow: 0 0 15px #00D2FF; }
+    .hero {
+      min-height: 90vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+    .hero-content { max-width: 600px; position: relative; z-index: 5; }
+    .hero h1 { font-size: 5.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 24px; }
+    .hero-image {
+      position: absolute;
+      left: 0;
+      width: 50%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+    }
+    .hero-image img {
+      max-width: 120%;
+      filter: drop-shadow(0 0 80px rgba(0,210,255,0.3));
+    }
+    @media (max-width: 1024px) {
+      .hero { flex-direction: column; text-align: center; padding-top: 120px; }
+      .hero-image { position: relative; width: 100%; margin-top: 40px; }
+      .hero-image img { max-width: 80%; }
+      h2 { font-size: 2.5rem; }
+    }
+    .products-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 30px;
+    }
+    .product-card {
+      background: rgba(20,20,20,0.8);
+      backdrop-filter: blur(10px);
+      border-radius: 32px;
+      padding: 24px;
+      border: 1px solid rgba(0,210,255,0.15);
+      transition: all 0.3s;
+    }
+    .product-card:hover {
+      transform: translateY(-10px);
+      border-color: #00D2FF;
+      box-shadow: 0 20px 40px rgba(0,210,255,0.2);
+    }
+    .product-img {
+      width: 100%;
+      aspect-ratio: 1/1;
+      object-fit: contain;
+      margin-bottom: 20px;
+      border-radius: 24px;
+    }
+    .product-label {
+      display: inline-block;
+      background: #00D2FF;
+      color: #0A0A0A;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      margin-bottom: 12px;
+    }
+    .product-name { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+    .product-price { font-size: 1.6rem; font-weight: 800; color: #00D2FF; margin-bottom: 20px; }
+    .order-btn {
+      width: 100%;
+      background: transparent;
+      border: 2px solid #00D2FF;
+      color: #00D2FF;
+      padding: 12px;
+      border-radius: 40px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .order-btn:hover {
+      background: #00D2FF;
+      color: #0A0A0A;
+      box-shadow: 0 0 20px #00D2FF;
+    }
+    .categories-container { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 40px; }
+    .cat-btn {
+      background: transparent;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 12px 32px;
+      border-radius: 40px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .cat-btn.active, .cat-btn:hover {
+      background: #00D2FF;
+      border-color: #00D2FF;
+      color: #0A0A0A;
+      box-shadow: 0 0 15px #00D2FF;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3,1fr);
+      gap: 30px;
+    }
+    .feature-card {
+      text-align: center;
+      padding: 40px 20px;
+      background: rgba(0,210,255,0.03);
+      border-radius: 40px;
+      border: 1px solid rgba(0,210,255,0.1);
+    }
+    .feature-card i { font-size: 2.5rem; color: #00D2FF; margin-bottom: 20px; }
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(2,1fr);
+      gap: 30px;
+    }
+    .testimonial-card {
+      background: #151515;
+      padding: 32px;
+      border-radius: 32px;
+      border-right: 4px solid #00D2FF;
+    }
+    .order-form {
+      background: #111;
+      border-radius: 48px;
+      padding: 48px;
+      max-width: 600px;
+      margin: 0 auto;
+      border: 1px solid #00D2FF;
+    }
+    .form-group { margin-bottom: 24px; }
+    .form-group input, .form-group textarea {
+      width: 100%;
+      padding: 18px;
+      background: #1E1E1E;
+      border: 1px solid #333;
+      border-radius: 20px;
+      color: #fff;
+      font-size: 1rem;
+    }
+    .whatsapp-float {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      background: #25D366;
+      width: 65px;
+      height: 65px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: white;
+      box-shadow: 0 0 30px #25D366;
+      z-index: 999;
+      transition: 0.3s;
+      text-decoration: none;
+    }
+    .whatsapp-float:hover { transform: scale(1.1); }
+    footer {
+      text-align: center;
+      padding: 40px 0;
+      border-top: 1px solid #222;
+      margin-top: 60px;
+    }
+  </style>
+</head>
+<body>
+
+<i class="fas fa-shoe-prints footprint-bg" style="top: 5%; left: -5%;"></i>
+<i class="fas fa-shoe-prints footprint-bg" style="bottom: 10%; right: -5%; transform: rotate(45deg);"></i>
+
+<div class="container">
+  <header>
+    <div class="logo">D<span class="glow-text">O</span>SSA</div>
+    <div class="social-links" id="headerSocialLinks"></div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-content">
+      <h1>STEP <br>INTO <span class="glow-text">YOUR STYLE</span></h1>
+      <p style="font-size: 1.2rem; margin-bottom: 32px; color: #aaa;">أحدث تشكيلة أحذية شبابية • جودة عالية • سعر تنافسي</p>
+      <a href="#products" class="btn-glow">تسوق الآن <i class="fas fa-arrow-left" style="margin-right: 8px;"></i></a>
+    </div>
+    <div class="hero-image" id="heroSneaker">
+      <img src="https://placehold.co/800x800/0A0A0A/00D2FF?text=DOSSA+SNEAKER" alt="DOSSA Sneaker" id="heroImage">
+    </div>
+  </section>
+
+  <section id="products">
+    <h2><i class="fas fa-fire"></i> أحدث القطرات</h2>
+    <div class="products-grid" id="productsContainer"></div>
+  </section>
+
+  <section id="categories">
+    <h2><i class="fas fa-tags"></i> تسوق حسب الأسلوب</h2>
+    <div class="categories-container">
+      <button class="cat-btn active" data-cat="all">الكل</button>
+      <button class="cat-btn" data-cat="Casual">كاجوال</button>
+      <button class="cat-btn" data-cat="Street">ستريت</button>
+      <button class="cat-btn" data-cat="Sport">رياضي</button>
+    </div>
+    <div class="products-grid" id="categoryProducts"></div>
+  </section>
+
+  <section>
+    <h2><i class="fas fa-crown"></i> ليه تختار DOSSA؟</h2>
+    <div class="features-grid">
+      <div class="feature-card"><i class="fas fa-medal"></i><h3>جودة عالية</h3><p>خامات أصلية تدوم طويلاً</p></div>
+      <div class="feature-card"><i class="fas fa-tag"></i><h3>سعر منافس</h3><p>أفضل قيمة مقابل السعر</p></div>
+      <div class="feature-card"><i class="fas fa-shipping-fast"></i><h3>توصيل سريع</h3><p>الشحن خلال 48 ساعة</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><i class="fas fa-comment-dots"></i> ماذا يقول عملاؤنا؟</h2>
+    <div class="testimonials-grid">
+      <div class="testimonial-card"><i class="fas fa-star" style="color:#FFD700;"></i><i class="fas fa-star" style="color:#FFD700;"></i><i class="fas fa-star" style="color:#FFD700;"></i><i class="fas fa-star" style="color:#FFD700;"></i><i class="fas fa-star" style="color:#FFD700;"></i><p style="margin: 20px 0;">"أحذية فخمة وجودة خرافية، بجد تستاهل كل جنيه."</p><h4>أحمد سعيد</h4></div>
+      <div class="testimonial-card"><i class="fas fa-star" style="color:#FFD700;"></i><i class="fas fa-star" style="color:#FFD700;"></i><i class="fas fa-star" style="color:#FFD700;"></i><i class="fas fa-star" style="color:#FFD700;"></i><i class="fas fa-star" style="color:#FFD700;"></i><p style="margin: 20px 0;">"التوصيل كان سريع جداً والتغليف تحفة. هطلب تاني أكيد."</p><h4>نورا علي</h4></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><i class="fab fa-whatsapp"></i> اطلب الآن عبر واتساب</h2>
+    <div class="order-form">
+      <div class="form-group"><input type="text" id="custName" placeholder="الاسم الكامل"></div>
+      <div class="form-group"><input type="tel" id="custPhone" placeholder="رقم الهاتف"></div>
+      <div class="form-group"><textarea id="custAddress" placeholder="العنوان بالتفصيل" rows="3"></textarea></div>
+      <button class="btn-glow" id="whatsappOrderBtn" style="width:100%;">إرسال الطلب عبر واتساب <i class="fab fa-whatsapp"></i></button>
+    </div>
+  </section>
+
+  <footer>
+    <div class="social-links" id="footerSocialLinks"></div>
+    <p style="margin-top: 20px; color: #666;">© 2025 DOSSA. جميع الحقوق محفوظة.</p>
+  </footer>
+</div>
+
+<a href="#" id="whatsappFloat" class="whatsapp-float" target="_blank"><i class="fab fa-whatsapp"></i></a>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCMJXK0y7Gico4ZMZmLORKItDfMmTnpt_A",
+    authDomain: "dossa-7d991.firebaseapp.com",
+    databaseURL: "https://dossa-7d991-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "dossa-7d991",
+    storageBucket: "dossa-7d991.firebasestorage.app",
+    messagingSenderId: "140143802952",
+    appId: "1:140143802952:web:d68e64ca1b2f3dfb03f67d"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const productsContainer = document.getElementById('productsContainer');
+  const categoryContainer = document.getElementById('categoryProducts');
+  const heroImage = document.getElementById('heroImage');
+  const whatsappFloat = document.getElementById('whatsappFloat');
+  const headerSocial = document.getElementById('headerSocialLinks');
+  const footerSocial = document.getElementById('footerSocialLinks');
+
+  let allProducts = [];
+  let settings = { whatsappNumber: '201234567890', instagram: '#', facebook: '#', tiktok: '#' };
+
+  async function loadSettings() {
+    const ref = db.ref('settings/contactInfo');
+    const snap = await ref.get();
+    if (snap.exists()) {
+      settings = snap.val();
+      updateSocialLinks();
+      whatsappFloat.href = `https://wa.me/${settings.whatsappNumber}`;
+      document.getElementById('whatsappOrderBtn').onclick = () => {
+        const name = document.getElementById('custName').value.trim();
+        const phone = document.getElementById('custPhone').value.trim();
+        const address = document.getElementById('custAddress').value.trim();
+        if (name && phone && address) {
+          window.open(`https://wa.me/${settings.whatsappNumber}?text=طلب%20جديد:%0Aالاسم:%20${name}%0Aالهاتف:%20${phone}%0Aالعنوان:%20${address}`, '_blank');
+        } else alert('الرجاء ملء جميع الحقول');
+      };
+    }
+  }
+
+  function updateSocialLinks() {
+    const html = `
+      <a href="${settings.instagram || '#'}" target="_blank"><i class="fab fa-instagram"></i></a>
+      <a href="${settings.facebook || '#'}" target="_blank"><i class="fab fa-facebook-f"></i></a>
+      <a href="${settings.tiktok || '#'}" target="_blank"><i class="fab fa-tiktok"></i></a>
+    `;
+    if (headerSocial) headerSocial.innerHTML = html;
+    if (footerSocial) footerSocial.innerHTML = html;
+  }
+
+  async function loadProducts() {
+    const ref = db.ref('products');
+    const snap = await ref.get();
+    allProducts = [];
+    snap.forEach(child => { allProducts.push({ id: child.key, ...child.val() }); });
+    allProducts.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+    renderProducts(allProducts.slice(0,4), productsContainer);
+    renderProducts(allProducts.slice(0,4), categoryContainer);
+    if (allProducts.length && allProducts[0].imageUrl) heroImage.src = allProducts[0].imageUrl;
+  }
+
+  function renderProducts(products, container) {
+    if (!container) return;
+    container.innerHTML = products.map(p => `
+      <div class="product-card">
+        ${p.label ? `<span class="product-label">${p.label}</span>` : ''}
+        <img src="${p.imageUrl || 'https://placehold.co/400/1a1a1a/00D2FF?text=DOSSA'}" class="product-img" alt="${p.name}">
+        <div class="product-name">${p.name}</div>
+        <div class="product-price">${p.price} ج.م</div>
+        <button class="order-btn" onclick="orderProduct('${p.name}')">اطلب الآن</button>
+      </div>
+    `).join('');
+    gsap.from(container.children, { scrollTrigger: { trigger: container, start: "top 80%" }, opacity: 0, y: 50, duration: 0.8, stagger: 0.1, ease: "power2.out" });
+  }
+
+  window.orderProduct = (name) => {
+    window.open(`https://wa.me/${settings.whatsappNumber}?text=أريد%20شراء%20${encodeURIComponent(name)}`, '_blank');
+  };
+
+  function initAnimations() {
+    gsap.registerPlugin(ScrollTrigger);
+    gsap.to("#heroSneaker img", { scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: 1 }, y: 150, scale: 1.1 });
+    const tl = gsap.timeline();
+    tl.from(".hero-content h1", { opacity: 0, y: 80, duration: 1.2, ease: "power3.out" })
+      .from(".hero-content p", { opacity: 0, y: 40, duration: 1, ease: "power3.out" }, "-=0.6")
+      .from(".hero-content .btn-glow", { opacity: 0, scale: 0.5, duration: 0.8, ease: "back.out(1.7)" }, "-=0.4");
+    gsap.utils.toArray('section').forEach(section => {
+      gsap.from(section, { scrollTrigger: { trigger: section, start: "top 80%", toggleActions: "play none none none" }, opacity: 0, y: 60, duration: 1 });
+    });
+    gsap.to(".btn-glow", { boxShadow: "0 0 50px rgba(0,210,255,0.8)", repeat: -1, yoyo: true, duration: 1.5 });
+  }
+
+  document.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const cat = this.dataset.cat;
+      const filtered = cat === 'all' ? allProducts : allProducts.filter(p => p.category === cat);
+      renderProducts(filtered.slice(0,4), categoryContainer);
+    });
+  });
+
+  window.onload = async () => {
+    await loadSettings();
+    await loadProducts();
+    initAnimations();
+  };
+</script>
+</body>
+</html>

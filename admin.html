@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة تحكم DOSSA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background:#0A0E14; color:#E0E0E0; min-height:100vh; display:flex; align-items:center; justify-content:center; }
+    #loginScreen { background:#111C26; padding:40px; border-radius:32px; width:100%; max-width:420px; border:1px solid #2A3A4A; }
+    #loginScreen h2 { color:#00D2FF; margin-bottom:24px; text-align:center; }
+    .input-group { margin-bottom:20px; }
+    .input-group input { width:100%; padding:16px; background:#1E2A36; border:1px solid #2A3A4A; border-radius:16px; color:#fff; font-size:1rem; }
+    .btn-login { width:100%; background:#00D2FF; color:#0A0E14; padding:16px; border:none; border-radius:40px; font-weight:700; cursor:pointer; }
+    .btn-login:hover { box-shadow:0 0 30px #00D2FF; }
+    .error-msg { color:#ff4d4d; margin-top:16px; text-align:center; }
+    #dashboardScreen { display:none; width:100%; padding:20px; }
+    .admin-container { max-width:1400px; margin:0 auto; }
+    .admin-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; }
+    .admin-header h1 { color:#00D2FF; }
+    .logout-btn { background:transparent; border:1px solid #ff4d4d; color:#ff4d4d; padding:10px 24px; border-radius:40px; cursor:pointer; }
+    .tabs { display:flex; gap:10px; margin-bottom:30px; border-bottom:1px solid #2A3A4A; }
+    .tab { padding:12px 24px; background:transparent; border:none; color:#AAA; font-weight:600; cursor:pointer; border-radius:12px 12px 0 0; }
+    .tab.active { background:#1E2A36; color:#00D2FF; }
+    .panel { background:#111C26; border-radius:24px; padding:30px; border:1px solid #2A3A4A; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .form-group { margin-bottom:20px; }
+    .form-group label { display:block; margin-bottom:8px; font-weight:600; color:#00D2FF; }
+    .form-group input, .form-group select { width:100%; padding:14px; background:#1E2A36; border:1px solid #2A3A4A; border-radius:12px; color:#fff; }
+    .btn { background:#00D2FF; color:#0A0E14; padding:14px 30px; border:none; border-radius:40px; font-weight:700; cursor:pointer; margin-right:10px; }
+    .btn-outline { background:transparent; border:1px solid #00D2FF; color:#00D2FF; }
+    table { width:100%; border-collapse:collapse; margin-top:20px; }
+    th, td { padding:16px; text-align:right; border-bottom:1px solid #2A3A4A; }
+    .product-thumb { width:60px; height:60px; object-fit:cover; border-radius:12px; }
+    .action-icons i { margin:0 8px; cursor:pointer; color:#AAA; }
+    .action-icons i:hover { color:#00D2FF; }
+    .progress-bar-container { margin-top:10px; height:6px; background:#1E2A36; border-radius:6px; }
+    .progress-bar { height:100%; width:0%; background:#00D2FF; border-radius:6px; }
+    .social-inputs { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    #settingsMsg { margin-top:20px; color:#0f0; }
+  </style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <h2><i class="fas fa-lock"></i> دخول المشرف</h2>
+  <div class="input-group"><input type="email" id="loginEmail" placeholder="البريد الإلكتروني" value="admin@dossa.com"></div>
+  <div class="input-group"><input type="password" id="loginPassword" placeholder="كلمة المرور" value="dossa123789123789"></div>
+  <button class="btn-login" id="loginBtn">تسجيل الدخول</button>
+  <div class="error-msg" id="loginError"></div>
+</div>
+
+<div id="dashboardScreen">
+  <div class="admin-container">
+    <div class="admin-header">
+      <h1><i class="fas fa-shoe-prints"></i> لوحة تحكم DOSSA</h1>
+      <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> تسجيل الخروج</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="products"><i class="fas fa-box"></i> المنتجات</button>
+      <button class="tab" data-tab="settings"><i class="fas fa-cog"></i> إعدادات التواصل</button>
+    </div>
+    <div id="productsPanel" class="panel">
+      <h2 style="margin-bottom:20px;"><i class="fas fa-plus-circle" style="color:#00D2FF;"></i> إضافة / تعديل منتج</h2>
+      <div class="form-grid">
+        <div class="form-group"><label>اسم المنتج</label><input type="text" id="prodName"></div>
+        <div class="form-group"><label>السعر (ج.م)</label><input type="number" id="prodPrice"></div>
+        <div class="form-group"><label>الفئة</label><select id="prodCategory"><option value="Casual">كاجوال</option><option value="Street">ستريت</option><option value="Sport">رياضي</option></select></div>
+        <div class="form-group"><label>العلامة</label><input type="text" id="prodLabel" placeholder="مثلاً: New Drop"></div>
+        <div class="form-group"><label>صورة المنتج</label><input type="file" id="prodImage" accept="image/*"></div>
+      </div>
+      <div class="progress-bar-container"><div class="progress-bar" id="uploadProgress"></div></div>
+      <button class="btn" id="addProductBtn"><i class="fas fa-cloud-upload-alt"></i> إضافة المنتج</button>
+      <button class="btn btn-outline" id="cancelEditBtn" style="display:none;">إلغاء التعديل</button>
+      <h2 style="margin:40px 0 20px;"><i class="fas fa-list"></i> قائمة المنتجات</h2>
+      <table id="productsTable"><thead><tr><th>الصورة</th><th>الاسم</th><th>السعر</th><th>الفئة</th><th>العلامة</th><th>إجراءات</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div id="settingsPanel" class="panel" style="display:none;">
+      <h2 style="margin-bottom:20px;"><i class="fab fa-whatsapp"></i> معلومات التواصل والسوشيال ميديا</h2>
+      <div class="social-inputs">
+        <div class="form-group"><label>رقم واتساب (مع الكود)</label><input type="text" id="waNumber" placeholder="201234567890"></div>
+        <div class="form-group"><label>رقم الهاتف البديل</label><input type="text" id="phoneNumber"></div>
+        <div class="form-group"><label>رابط إنستغرام</label><input type="text" id="instaLink"></div>
+        <div class="form-group"><label>رابط فيسبوك</label><input type="text" id="fbLink"></div>
+        <div class="form-group"><label>رابط تيك توك</label><input type="text" id="tiktokLink"></div>
+      </div>
+      <button class="btn" id="saveSettingsBtn"><i class="fas fa-save"></i> حفظ الإعدادات</button>
+      <p id="settingsMsg"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCMJXK0y7Gico4ZMZmLORKItDfMmTnpt_A",
+    authDomain: "dossa-7d991.firebaseapp.com",
+    databaseURL: "https://dossa-7d991-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "dossa-7d991",
+    storageBucket: "dossa-7d991.firebasestorage.app",
+    messagingSenderId: "140143802952",
+    appId: "1:140143802952:web:d68e64ca1b2f3dfb03f67d"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const storage = firebase.storage();
+  const auth = firebase.auth();
+
+  const loginScreen = document.getElementById('loginScreen');
+  const dashboardScreen = document.getElementById('dashboardScreen');
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const loginError = document.getElementById('loginError');
+  const tabBtns = document.querySelectorAll('.tab');
+  const panels = { products: document.getElementById('productsPanel'), settings: document.getElementById('settingsPanel') };
+  const prodName = document.getElementById('prodName'), prodPrice = document.getElementById('prodPrice'), prodCategory = document.getElementById('prodCategory');
+  const prodLabel = document.getElementById('prodLabel'), prodImage = document.getElementById('prodImage');
+  const addBtn = document.getElementById('addProductBtn'), cancelBtn = document.getElementById('cancelEditBtn');
+  const progressBar = document.getElementById('uploadProgress');
+  const tbody = document.querySelector('#productsTable tbody');
+  const waNumber = document.getElementById('waNumber'), phoneNumber = document.getElementById('phoneNumber');
+  const instaLink = document.getElementById('instaLink'), fbLink = document.getElementById('fbLink'), tiktokLink = document.getElementById('tiktokLink');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn'), settingsMsg = document.getElementById('settingsMsg');
+  let currentEditId = null;
+
+  loginBtn.addEventListener('click', () => {
+    auth.signInWithEmailAndPassword(document.getElementById('loginEmail').value, document.getElementById('loginPassword').value)
+      .then(() => { loginScreen.style.display='none'; dashboardScreen.style.display='block'; loadProductsTable(); loadSettingsForm(); })
+      .catch(err => { loginError.textContent = 'خطأ: ' + err.message; });
+  });
+  logoutBtn.addEventListener('click', () => auth.signOut());
+  auth.onAuthStateChanged(user => {
+    if (user) { loginScreen.style.display='none'; dashboardScreen.style.display='block'; loadProductsTable(); loadSettingsForm(); }
+    else { dashboardScreen.style.display='none'; loginScreen.style.display='flex'; }
+  });
+
+  tabBtns.forEach(btn => btn.addEventListener('click', () => {
+    tabBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active');
+    panels.products.style.display = btn.dataset.tab === 'products' ? 'block' : 'none';
+    panels.settings.style.display = btn.dataset.tab === 'settings' ? 'block' : 'none';
+  }));
+
+  function loadProductsTable() {
+    db.ref('products').on('value', snap => {
+      let html = '';
+      snap.forEach(child => {
+        const p = child.val();
+        html += `<tr><td><img src="${p.imageUrl||''}" class="product-thumb"></td><td>${p.name}</td><td>${p.price} ج.م</td><td>${p.category}</td><td>${p.label||'-'}</td>
+          <td class="action-icons"><i class="fas fa-edit" onclick="editProduct('${child.key}')"></i><i class="fas fa-trash-alt" onclick="deleteProduct('${child.key}')"></i></td></tr>`;
+      });
+      tbody.innerHTML = html;
+    });
+  }
+  window.editProduct = async (id) => {
+    const snap = await db.ref('products/'+id).get();
+    const p = snap.val();
+    prodName.value = p.name; prodPrice.value = p.price; prodCategory.value = p.category; prodLabel.value = p.label||'';
+    currentEditId = id; addBtn.innerHTML = '<i class="fas fa-save"></i> تحديث المنتج'; cancelBtn.style.display='inline-block';
+  };
+  window.deleteProduct = (id) => { if(confirm('متأكد؟')) db.ref('products/'+id).remove(); };
+  cancelBtn.onclick = () => {
+    currentEditId=null; addBtn.innerHTML='<i class="fas fa-cloud-upload-alt"></i> إضافة المنتج'; cancelBtn.style.display='none';
+    prodName.value=prodPrice.value=prodLabel.value=''; prodImage.value=''; progressBar.style.width='0%';
+  };
+  addBtn.onclick = async () => {
+    const file = prodImage.files[0];
+    if(!prodName.value||!prodPrice.value) return alert('الاسم والسعر مطلوبان');
+    let imageUrl = '';
+    if(file) {
+      const storageRef = storage.ref(`sneakers/${Date.now()}_${file.name}`);
+      const task = storageRef.put(file);
+      task.on('state_changed', snap => progressBar.style.width = (snap.bytesTransferred/snap.totalBytes)*100+'%',
+        err => alert('خطأ في الرفع'),
+        async () => { imageUrl = await task.snapshot.ref.getDownloadURL(); saveProduct(imageUrl); });
+    } else if(currentEditId) {
+      imageUrl = (await db.ref('products/'+currentEditId).get()).val().imageUrl;
+      saveProduct(imageUrl);
+    } else alert('الرجاء اختيار صورة');
+  };
+  async function saveProduct(imageUrl) {
+    const product = { name: prodName.value, price: Number(prodPrice.value), category: prodCategory.value, label: prodLabel.value, imageUrl, createdAt: Date.now() };
+    if(currentEditId) db.ref('products/'+currentEditId).update(product);
+    else db.ref('products').push(product);
+    progressBar.style.width='0%'; cancelBtn.click();
+  }
+  async function loadSettingsForm() {
+    const snap = await db.ref('settings/contactInfo').get();
+    if(snap.exists()) {
+      const d = snap.val();
+      waNumber.value = d.whatsappNumber||''; phoneNumber.value = d.phone||'';
+      instaLink.value = d.instagram||''; fbLink.value = d.facebook||''; tiktokLink.value = d.tiktok||'';
+    }
+  }
+  saveSettingsBtn.onclick = async () => {
+    await db.ref('settings/contactInfo').set({
+      whatsappNumber: waNumber.value, phone: phoneNumber.value,
+      instagram: instaLink.value, facebook: fbLink.value, tiktok: tiktokLink.value
+    });
+    settingsMsg.textContent = 'تم الحفظ ✓'; setTimeout(()=>settingsMsg.textContent='',3000);
+  };
+</script>
+</body>
+</html>
